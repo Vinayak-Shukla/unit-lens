@@ -97,13 +97,14 @@
 
     // Longest aliases first so "fluid ounces" / "km/h" beat "l" / "km".
     const byLen = (a, b) => b.length - a.length;
-    // (?<![A-Za-z0-9]) — don't start in the middle of a word/number.
-    // (?![A-Za-z])     — don't let "mi" swallow the start of "mid".
+    // (?<![A-Za-z0-9#$]) — don't start in the middle of a word/number, and
+    //                      don't match ranks/prices like "#2" or "$2".
+    // (?![A-Za-z])       — don't let "mi" swallow the start of "mid".
     function build(aliases, gap) {
       if (!aliases.length) return null;
       const alt = aliases.sort(byLen).map(escapeRegex).join("|");
       return new RegExp(
-        "(?<![A-Za-z0-9])(" + NUM + ")" + gap + "(" + alt + ")(?![A-Za-z])",
+        "(?<![A-Za-z0-9#$])(" + NUM + ")" + gap + "(" + alt + ")(?![A-Za-z])",
         "gi"
       );
     }
@@ -117,12 +118,38 @@
 
   // Temperature needs a degree symbol or a spelled-out word to avoid matching
   // stray letters like "5K" (which usually means 5000, not 5 kelvin).
-  const TEMP_SYMBOL = /(?<![A-Za-z0-9])([-+]?\d+(?:\.\d+)?)\s*°\s*(C|F|K)(?![A-Za-z])/gi;
-  const TEMP_WORD = /(?<![A-Za-z0-9])([-+]?\d+(?:\.\d+)?)\s*°?\s*(celsius|centigrade|fahrenheit|kelvin)(?![A-Za-z])/gi;
+  const TEMP_SYMBOL = /(?<![A-Za-z0-9#$])([-+]?\d+(?:\.\d+)?)\s*°\s*(C|F|K)(?![A-Za-z])/gi;
+  const TEMP_WORD = /(?<![A-Za-z0-9#$])([-+]?\d+(?:\.\d+)?)\s*°?\s*(celsius|centigrade|fahrenheit|kelvin)(?![A-Za-z])/gi;
   const TEMP_WORD_UNIT = { celsius: "C", centigrade: "C", fahrenheit: "F", kelvin: "K" };
 
   function parseNumber(raw) {
     return parseFloat(raw.replace(/,/g, ""));
+  }
+
+  // Words that, following "in", confirm it means inches rather than the English
+  // preposition: "5 in long", "5 in by 3 in", "2 in of rain".
+  const INCH_QUALIFIERS = new Set([
+    "long", "longer", "wide", "wider", "tall", "taller", "deep", "deeper",
+    "high", "higher", "thick", "thicker", "diameter", "diagonal", "radius",
+    "square", "x", "by", "of", "and", "or", "apart", "across", "thick.",
+  ]);
+
+  // A number+"st" with no space is an ordinal (1st, 21st, 31st) — not stones.
+  // Valid "st" ordinals: n % 10 === 1 and n % 100 !== 11. "10 st" (spaced) is
+  // still treated as the weight unit.
+  function isStOrdinal(value, original) {
+    if (/\s/.test(original)) return false;
+    const n = Math.abs(Math.trunc(value));
+    return n % 10 === 1 && n % 100 !== 11;
+  }
+
+  // "in" is the English preposition when a non-qualifier word or another number
+  // follows it ("2 in india", "2 in 3 people") rather than inches.
+  function isInPreposition(text, end) {
+    const after = text.slice(end);
+    const word = after.match(/^\s+([A-Za-z]+)/);
+    if (word) return !INCH_QUALIFIERS.has(word[1].toLowerCase());
+    return /^\s+\d/.test(after);
   }
 
   // Scan a plain string and return a sorted, non-overlapping list of matches:
@@ -137,15 +164,23 @@
         let m;
         regex.lastIndex = 0;
         while ((m = regex.exec(text)) !== null) {
-          const info = matcher.lookup[m[2].toLowerCase()];
+          const alias = m[2].toLowerCase();
+          const info = matcher.lookup[alias];
           if (!info) continue;
+          const original = m[0];
+          const end = m.index + original.length;
+          const value = parseNumber(m[1]);
+          if (info.unit === "st" && isStOrdinal(value, original)) continue;
+          // The preposition "in" always has a space ("2 in india"); an attached
+          // form ("6in") is always the unit.
+          if (alias === "in" && /\s/.test(original) && isInPreposition(text, end)) continue;
           matches.push({
             start: m.index,
-            end: m.index + m[0].length,
-            original: m[0],
+            end: end,
+            original: original,
             category: info.category,
             fromUnit: info.unit,
-            value: parseNumber(m[1]),
+            value: value,
           });
         }
       });

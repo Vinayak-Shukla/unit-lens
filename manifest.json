@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Unit Lens — Auto Unit Converter",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Automatically converts measurements on any web page (length, mass, temperature, volume, speed, area) into the units you prefer.",
   "icons": {
     "16": "icons/icon16.png",
