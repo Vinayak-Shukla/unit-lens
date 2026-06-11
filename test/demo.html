@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Unit Lens — Demo</title>
+    <style>
+      body {
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+        max-width: 720px;
+        margin: 24px auto;
+        padding: 0 16px 60px;
+        color: #1d2433;
+        line-height: 1.6;
+      }
+      h1 { color: #0d9488; }
+      .panel {
+        position: sticky;
+        top: 0;
+        background: #f8fafc;
+        border: 1px solid #e5e7eb;
+        border-radius: 10px;
+        padding: 12px 14px;
+        margin-bottom: 20px;
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+        gap: 8px 14px;
+        align-items: center;
+        font-size: 13px;
+      }
+      .panel label { display: flex; justify-content: space-between; gap: 8px; align-items: center; }
+      .panel select { padding: 3px 6px; border: 1px solid #cbd5e1; border-radius: 6px; }
+      .panel .master { grid-column: 1 / -1; font-weight: 600; }
+      .sample { background: #fff; }
+      code { background: #f1f5f9; padding: 0 4px; border-radius: 4px; }
+      .note { color: #6b7280; font-size: 13px; }
+      span.unit-lens-converted { background: #ccfbf1; }
+    </style>
+  </head>
+  <body>
+    <h1>⇄ Unit Lens — live demo</h1>
+    <p class="note">
+      This page loads the real extension scripts with a small fake
+      <code>chrome.storage</code>. Change a target unit below and the text
+      re-converts instantly. Converted values are highlighted; hover to see the
+      original.
+    </p>
+
+    <div class="panel" id="panel">
+      <label class="master">
+        Conversions
+        <input type="checkbox" id="master" checked />
+      </label>
+      <!-- per-category selects injected here -->
+    </div>
+
+    <div class="sample">
+      <h2>A weekend in numbers</h2>
+      <p>
+        We hiked a <strong>5 mile</strong> loop that climbed
+        <strong>1,200 ft</strong>, carrying packs that weighed about
+        <strong>22 lb</strong> each plus <strong>3 stone</strong> of shared gear.
+        The trailhead sign said the summit lake covers <strong>40 acres</strong>.
+      </p>
+      <p>
+        It hit <strong>92°F</strong> by noon, so we drank nearly
+        <strong>2 gallons</strong> of water between us and topped up with another
+        <strong>16 fl oz</strong> each at the spring. On the drive home we cruised
+        at <strong>65 mph</strong> on the interstate.
+      </p>
+      <p>
+        For dinner: a recipe calling for <strong>2 cups</strong> of flour,
+        <strong>8 oz</strong> butter, baked at <strong>350°F</strong>. The new
+        oven is rated to <strong>500 fahrenheit</strong>.
+      </p>
+      <p class="note">
+        These should be ignored: a <strong>5G</strong> phone, a
+        <strong>4K</strong> monitor, a <strong>$20K</strong> car.
+      </p>
+    </div>
+
+    <!-- fake chrome.storage so the real content script runs unmodified -->
+    <script>
+      (function () {
+        const listeners = [];
+        let store = {};
+        window.chrome = {
+          storage: {
+            sync: {
+              get(key, cb) {
+                const out = {};
+                const keys = Array.isArray(key) ? key : [key];
+                keys.forEach((k) => { if (k in store) out[k] = store[k]; });
+                cb(out);
+              },
+              set(obj, cb) {
+                const changes = {};
+                Object.keys(obj).forEach((k) => {
+                  changes[k] = { oldValue: store[k], newValue: obj[k] };
+                  store[k] = obj[k];
+                });
+                listeners.forEach((fn) => fn(changes, "sync"));
+                if (cb) cb();
+              },
+            },
+            onChanged: { addListener(fn) { listeners.push(fn); } },
+          },
+        };
+      })();
+    </script>
+    <script src="../src/units.js"></script>
+    <script src="../src/converter.js"></script>
+
+    <!-- build the control panel from the real category definitions -->
+    <script>
+      (function () {
+        const UL = window.UnitLens;
+        const settings = UL.defaultSettings();
+        // seed storage before the content script reads it
+        chrome.storage.sync.set({ unitLensSettings: settings });
+
+        const panel = document.getElementById("panel");
+        Object.keys(UL.CATEGORIES).forEach((cat) => {
+          const def = UL.CATEGORIES[cat];
+          const label = document.createElement("label");
+          label.textContent = def.label;
+          const sel = document.createElement("select");
+          def.targets.forEach((u) => {
+            const o = document.createElement("option");
+            o.value = u;
+            o.textContent = def.units[u].display;
+            if (u === settings.targets[cat]) o.selected = true;
+            sel.appendChild(o);
+          });
+          sel.addEventListener("change", () => {
+            settings.targets[cat] = sel.value;
+            chrome.storage.sync.set({ unitLensSettings: clone(settings) });
+          });
+          label.appendChild(sel);
+          panel.appendChild(label);
+        });
+
+        document.getElementById("master").addEventListener("change", (e) => {
+          settings.enabled = e.target.checked;
+          chrome.storage.sync.set({ unitLensSettings: clone(settings) });
+        });
+
+        function clone(o) { return JSON.parse(JSON.stringify(o)); }
+      })();
+    </script>
+    <script src="../src/content.js"></script>
+  </body>
+</html>

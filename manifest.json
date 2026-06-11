@@ -1,0 +1,29 @@
+{
+  "manifest_version": 3,
+  "name": "Unit Lens — Auto Unit Converter",
+  "version": "1.0.0",
+  "description": "Automatically converts measurements on any web page (length, mass, temperature, volume, speed, area) into the units you prefer.",
+  "icons": {
+    "16": "icons/icon16.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  },
+  "action": {
+    "default_popup": "src/popup.html",
+    "default_title": "Unit Lens",
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "48": "icons/icon48.png",
+      "128": "icons/icon128.png"
+    }
+  },
+  "permissions": ["storage"],
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["src/units.js", "src/converter.js", "src/content.js"],
+      "run_at": "document_idle",
+      "all_frames": false
+    }
+  ]
+}

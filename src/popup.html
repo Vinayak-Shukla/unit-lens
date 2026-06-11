@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="stylesheet" href="popup.css" />
+    <title>Unit Lens</title>
+  </head>
+  <body>
+    <header class="header">
+      <div class="brand">
+        <span class="logo">⇄</span>
+        <h1>Unit Lens</h1>
+      </div>
+      <label class="switch" title="Turn all conversions on or off">
+        <input type="checkbox" id="master-toggle" />
+        <span class="slider"></span>
+      </label>
+    </header>
+
+    <p class="hint">
+      Pick the unit you want each measurement converted <em>to</em>. Toggle a
+      row off to leave that kind of measurement untouched.
+    </p>
+
+    <ul id="category-list" class="category-list"></ul>
+
+    <footer class="footer">
+      <span id="status">Changes apply on the next page load or refresh.</span>
+    </footer>
+
+    <script src="units.js"></script>
+    <script src="popup.js"></script>
+  </body>
+</html>
